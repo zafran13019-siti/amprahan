@@ -1501,37 +1501,49 @@ async function processAllFiles() {
 }
 
 function calculateAttendance(text) {
-  // Parse attendance table to count TL and PSW categories
-  const result = { tl1: 0, tl2: 0, tl3: 0, tl4: 0, psw1: 0, psw2: 0, psw3: 0, psw4: 0 };
+  const result = { 
+    tl1: 0, tl2: 0, tl3: 0, tl4: 0, 
+    psw1: 0, psw2: 0, psw3: 0, psw4: 0 
+  };
   
-  // Look for TERLAMBAT and PSW columns in the attendance table
   const lines = text.split('\n');
-  let inTable = false;
   
   for (let line of lines) {
-    // Try to find date patterns and extract TL/PSW values
-    const dateMatch = line.match(/(\d{2}-\d{2}-\d{4})/);
-    if (dateMatch) {
-      // Extract numbers from the line
-      const numbers = line.match(/([\d.]+)/g);
-      if (numbers) {
-        // Simple heuristic: first number is TL, second is PSW
-        const tl = parseFloat(numbers[0]);
-        const psw = numbers.length > 1 ? parseFloat(numbers[1]) : 0;
-        
-        if (!isNaN(tl)) {
-          if (tl <= 0.5) result.tl1++;
-          else if (tl <= 1) result.tl2++;
-          else if (tl <= 1.25) result.tl3++;
-          else result.tl4++;
-        }
-        if (!isNaN(psw) && psw > 0) {
-          if (psw <= 0.5) result.psw1++;
-          else if (psw <= 1) result.psw2++;
-          else if (psw <= 1.25) result.psw3++;
-          else result.psw4++;
-        }
-      }
+    // Hanya proses baris yang mengandung tanggal DD-MM-YYYY
+    if (!line.match(/\d{2}-\d{2}-\d{4}/)) continue;
+    
+    // Split by pipe |
+    const cells = line.split('|').map(c => c.trim());
+    
+    // Cari index kolom tanggal
+    let dateIdx = cells.findIndex(c => c.match(/\d{2}-\d{2}-\d{4}/));
+    if (dateIdx === -1) continue;
+    
+    // Format PDF Kemenag:
+    // | TANGGAL | HARI | TERLAMBAT | PSW | TANPA KETERANGAN | LAINNYA | TOTAL PERSENTASE | TOTAL POTONGAN | KETERANGAN |
+    // Index:      0       1       2          3         4              5            6                 7              8
+    
+    const terlambatCell = (cells[dateIdx + 2] || '').trim();
+    const pswCell = (cells[dateIdx + 3] || '').trim();
+    
+    // Parse nilai (jika "-" atau kosong = 0)
+    const terlambat = terlambatCell.match(/^\d+\.?\d*$/) ? parseFloat(terlambatCell) : 0;
+    const psw = pswCell.match(/^\d+\.?\d*$/) ? parseFloat(pswCell) : 0;
+    
+    // Kategorikan TL
+    if (terlambat > 0) {
+      if (terlambat <= 0.5) result.tl1++;
+      else if (terlambat <= 1) result.tl2++;
+      else if (terlambat <= 1.25) result.tl3++;
+      else result.tl4++;
+    }
+    
+    // Kategorikan PSW
+    if (psw > 0) {
+      if (psw <= 0.5) result.psw1++;
+      else if (psw <= 1) result.psw2++;
+      else if (psw <= 1.25) result.psw3++;
+      else result.psw4++;
     }
   }
   
